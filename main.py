@@ -56,44 +56,49 @@ def main():
         for name,layer in model.net.named_children():
             X_A=layer(X_A)
             X_B=layer(X_B)
-            if name=='b4':
+            if name=='b3':#b4からb3に変更
                 feat_A=X_A
                 feat_B=X_B
                 break
 
-    diff_map = torch.mean((feat_A - feat_B) ** 2, dim=1,keepdim=True)
+    #diff_map = torch.mean((feat_A - feat_B) ** 2, dim=1,keepdim=True)
+    diff_map = torch.max(torch.abs(feat_A - feat_B), dim=1, keepdim=True)[0]#絶対値の差の最大値を採用
 
-    diff_map = F.avg_pool2d(diff_map, kernel_size=3, stride=1, padding=1)
+    diff_map = F.avg_pool2d(diff_map, kernel_size=5, stride=1, padding=2)#カーネルサイズの拡大
 
-    # 元の画像サイズ（448x448）に引き伸ばす
+    # 元の画像サイズ（448x448）に引き伸ばし
     diff_map_resized = F.interpolate(diff_map, size=img_size, mode='bilinear', align_corners=False)
     diff_map_numpy = diff_map_resized.squeeze().numpy()
 
-    # 閾値の調整（ノイズが減ったので、少しシビアに設定：上位50%）
-    threshold = diff_map_numpy.max() * 0.50
-    mask = diff_map_numpy > threshold
+    diff_map_numpy = (diff_map_numpy - diff_map_numpy.min()) / (diff_map_numpy.max() - diff_map_numpy.min() + 1e-8)
+    # 閾値の調整
+    #threshold = diff_map_numpy.max() * 0.50
+    #mask = diff_map_numpy > threshold
 
     # 可視化処理
     original_img = Image.open('machigai01.png').resize(img_size)
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.imshow(original_img)
 
+    ax.imshow(diff_map_numpy, cmap='Reds', alpha=0.35)
+    threshold = 0.65
     # グリッドによる枠線の描画判定（細かく見つけるためサイズを16から8に変更）
-    grid_size = 8
-    for y in range(0, img_size[1], grid_size):
-        for x in range(0, img_size[0], grid_size):
-            # そのエリア内のマスク（間違い判定）の割合をチェック
-            if mask[y:y+grid_size, x:x+grid_size].sum() > (grid_size * grid_size * 0.15):
-                rect = patches.Rectangle(
-                    (x, y), grid_size, grid_size, 
-                    linewidth=1.5, edgecolor='red', facecolor='none'
+    step = 24
+    for y in range(step, img_size[1] - step, step):
+        for x in range(step, img_size[0] - step, step):
+            local_area = diff_map_numpy[y-step:y+step, x-step:x+step]
+            # 周辺で自分が一番強く、かつ閾値を超えている場合のみ、そこに間違いがあると判定
+            if diff_map_numpy[y, x] == local_area.max() and diff_map_numpy[y, x] > threshold:
+                # 検出したポイントに綺麗な赤丸を描く
+                circle = patches.Circle(
+                    (x, y), radius=20, 
+                    linewidth=2.5, edgecolor='red', facecolor='none'
                 )
-                ax.add_patch(rect)
+                ax.add_patch(circle)
 
-    plt.title("Detected Differences (Optimized)")
+    plt.title("Detected Differences (High Precision)")
     plt.axis('off')
     plt.savefig('result_machigai.png', bbox_inches='tight')
     plt.show()
-    print("最適化した間違い検出が完了しました！ 'result_machigai.png' を確認してください。")
 if __name__ == "__main__":
     main()
