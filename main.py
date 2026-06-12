@@ -48,8 +48,8 @@ def main():
     model.eval() # 推論モードに設定 (BatchNormなどを固定)
 
     img_size = (448, 448)
-    input_A = load_and_preprocess_image('machigai01.png', size=img_size)
-    input_B = load_and_preprocess_image('machigai02.png', size=img_size)
+    input_A = load_and_preprocess_image('machigai02_1.png', size=img_size)
+    input_B = load_and_preprocess_image('machigai02_2.png', size=img_size)
 
     with torch.no_grad():
         X_A,X_B=input_A,input_B
@@ -76,7 +76,7 @@ def main():
     #mask = diff_map_numpy > threshold
 
     # 可視化処理
-    original_img = Image.open('machigai01.png').resize(img_size)
+    original_img = Image.open('machigai02_1.png').resize(img_size)
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.imshow(original_img)
 
